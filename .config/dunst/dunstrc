@@ -1,0 +1,46 @@
+[global]
+    width = 350
+    height = (0, 100)
+    offset = (20, 20)
+    origin = top-right
+
+    gap_size = 10
+    padding = 15
+    horizontal_padding = 15
+
+    frame_width = 2
+    frame_color = "#d0d0d0"
+
+    transparency = 5
+
+    font = JetBrainsMono Nerd Font 11
+
+    background = "#0e0e0e"
+    foreground = "#d0d0d0"
+
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 64
+
+    markup = full
+    format = "<b>%s</b>\n%b"
+
+    progress_bar = true
+    progress_bar_height = 8
+    progress_bar_frame_width = 0
+
+[urgency_low]
+background = "#0e0e0e"
+foreground = "#d0d0d0"
+timeout=3
+
+[urgency_normal]
+background = "#0e0e0e"
+foreground = "#d0d0d0"
+timeout=5
+
+[urgency_critical]
+background = "#0e0e0e"
+foreground = "#d0d0d0"
+frame_color="#f38ba8"
+timeout=0
