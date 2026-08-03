@@ -19,7 +19,6 @@ main() {
     setup_btrfs
     setup_swap
     setup_system
-    post_install
 
     echo "Installation concluded with success!"
     echo "Remove your archiso and reboot your sistem."
@@ -28,7 +27,7 @@ main() {
 user_options() {
     lsblk
     read -rp "Enter disk to install on (e.g., /dev/nvme0n1p1, /dev/sda): " DISK
-    read -rp "Enter swap size (GB)" SWAP_SIZE
+    read -rp "Enter swap size (GB): " SWAP_SIZE
     read -rp "Enter timezone (e.g., America/Sao_Paulo): " TIMEZONE
     read -rp "Enter hostname: " HOSTNAME
     read -rp "Enter username: " USERNAME
@@ -52,6 +51,7 @@ user_options() {
 
 confirm_disk() {
     echo "ATTENTION: ALL DATA IN $DISK WILL BE ERASED"
+    echo
     lsblk "$DISK"
 
     read -rp "Type 'ERASE' to confirm: " CONFIRM
@@ -73,6 +73,8 @@ setup_disk() {
 }
 
 wipe_disk() {
+    wipefs -af "$DISK"
+    sgdisk --zap-all "$DISK"
 }
 
 part_disk() {
@@ -148,6 +150,7 @@ setup_system() {
         /mnt \
         base \
         linux \
+        linux-lts \
         linux-firmware \
         linux-headers \
         $UCODE_PACKAGE \
@@ -223,8 +226,10 @@ systemctl enable NetworkManager
 
 EOF
 
+echo "Type your root password: "
 arch-chroot /mnt passwd
 arch-chroot /mnt useradd -m -G wheel "$USERNAME"
+echo "Type your user password: "
 arch-chroot /mnt passwd "$USERNAME"
 }
 
