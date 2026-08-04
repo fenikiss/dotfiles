@@ -14,8 +14,8 @@ RESET='\033[0m'
 VERBOSE=false
 
 main() {
-    ping -c1 archlinux.org
-    user_options
+    run ping -c1 archlinux.org
+    user_options "$@"
     confirm_disk
     set_time
     setup_disk
@@ -24,13 +24,14 @@ main() {
     setup_system
 
     success "Installation concluded!"
-    echo "Remove your archiso and reboot your system."
+    echo "Remove your archiso and reboot your system"
+    echo "Recomendations: Setup yay and timeshift/snapper"
 }
 
 user_options() {
     get_flags "$@"
 
-    echo -e "\n${BLUE}Available disks:${RESET}"
+    echo -e "\nAvailable disks:"
     lsblk -d -o NAME,SIZE,MODEL | grep -v "loop"
      while true; do
         read -p "Enter disk to install on (e.g., /dev/nvme0n1, /dev/sda): " DISK
@@ -70,6 +71,12 @@ user_options() {
 
 }
 
+select_disk() {
+    mapfile -t DISKS < <(lsblk -d -n -o NAME,SIZE,MODEL -e 7,11 | awk '{print "/dev/"$1" ("$2" "$3")"}')
+
+
+}
+
 get_flags() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -86,7 +93,7 @@ get_flags() {
 }
 
 info() {
-    echo -e "${BLUE}[INFO]${RESET} $1"
+    echo -e "[INFO] $1"
 }
 
 success() {
@@ -165,12 +172,21 @@ format_parts() {
 }
 
 encrypt_root() {
-    info "Encrypting root disk..."
+    info "Encrypting root partition..."
 
-    echo "Enter your LUKS password: "
-    cryptsetup luksFormat "$ROOT"
-    info "Opening root..."
-    cryptsetup open "$ROOT" "$CRYPT_NAME"
+    echo "Enter your LUKS password for $ROOT: "
+    read_password "LUKS password"
+    local luks_pass="$PASSWORD"
+    unset PASSWORD
+
+    info "Formatting LUKS container..."
+    printf '%s' "$luks_pass" | cryptsetup luksFormat --batch-mode "$ROOT" -
+
+    info "Opening LUKS container..."
+    printf '%s' "$luks_pass" | cryptsetup open "$ROOT" "$CRYPT_NAME" -
+
+    unset luks_pass
+    success "LUKS container formatted and opened"
 }
 
 setup_lvm() {
@@ -241,7 +257,7 @@ run_with_spinner() {
 
     while kill -0 "$pid" 2>/dev/null; do
         i=$(( (i + 1) % 4 ))
-        printf "\r${BLUE}[INFO]${RESET} %s... %s" "$msg" "${spin:$i:1}"
+        printf "\r[INFO] %s... %s" "$msg" "${spin:$i:1}"
         sleep 0.1
     done
 
@@ -256,15 +272,14 @@ run_with_spinner() {
 }
 
 read_password() {
+    local prompt_label="${1:-password}"
     local pass1 pass2
 
     while true; do
-        read -rs -p "Enter new password: " pass1
+        read -rs -p "Enter $prompt_label: " pass1
         echo
-
-        read -rs -p "Confirm new password: " pass2
+        read -rs -p "Confirm $prompt_label: " pass2
         echo
-
         if [[ -z "$pass1" ]]; then
             echo "Password cannot be empty. Please try again."
         elif [[ "$pass1" == "$pass2" ]]; then
@@ -274,6 +289,24 @@ read_password() {
             echo "Passwords do not match. Please try again."
         fi
     done
+}
+
+encrypt_root() {
+    info "Encrypting root partition..."
+
+    echo "Set encryption password for $ROOT:"
+    read_password "LUKS password"
+    local luks_pass="$PASSWORD"
+    unset PASSWORD
+
+    info "Formatting LUKS container..."
+    printf '%s' "$luks_pass" | cryptsetup luksFormat --batch-mode "$ROOT" -
+
+    info "Opening LUKS container..."
+    printf '%s' "$luks_pass" | cryptsetup open "$ROOT" "$CRYPT_NAME" -
+
+    unset luks_pass
+    success "LUKS container formatted and opened"
 }
 
 setup_system() {
@@ -301,6 +334,7 @@ setup_system() {
         texinfo \
         vim \
         nano
+
 
     create_fstab
 
@@ -369,17 +403,20 @@ EOF
 success "System setup complete"
 
 echo "Set root password:"
-echo
-read_password
-echo "root:$PASSWORD" | arch-chroot /mnt chpasswd
+read_password "Root password"
+local root_pass="$PASSWORD"
+unset PASSWORD
+echo "root:$root_pass" | arch-chroot /mnt chpasswd
 
 arch-chroot /mnt useradd -m -G wheel "$USERNAME"
 
 echo "Set password for $USERNAME:"
-read_password
-echo "$USERNAME:$PASSWORD" | arch-chroot /mnt chpasswd
+read_password "$USERNAME password"
+local user_pass="$PASSWORD"
+unset PASSWORD
+echo "$USERNAME:$user_pass" | arch-chroot /mnt chpasswd
 
-unset PASS1 PASS2 PASSWORD
+unset PASS1 PASS2 PASSWORD user_pass root_pass
 }
 
 create_fstab() {
